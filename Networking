@@ -1,0 +1,106 @@
+When a pod runs in a Kubernetes environment, it operates within a specific network namespace. Let's break down the key concepts and steps mentioned in your scenario to understand the behavior and networking interactions:
+
+What Happens When the Pod Runs:
+Pod Definition: The given pod definition creates a pod with two containers:
+
+Container 1: busybox (running a command to sleep for a long time).
+Container 2: nginx (a web server).
+Both containers share the same network namespace because they are part of the same pod. In Kubernetes, containers within the same pod share the same network namespace, meaning they can communicate with each other via localhost and use the same IP address.
+
+Network Namespace in Pods: Each pod has its own network namespace, which includes the network interfaces, routing, and firewall rules. The pod is assigned an IP address and may use veth pairs to communicate with other network namespaces on the host or in other pods.
+
+How to Check Networking Details:
+Here are some commands that you can use to inspect and understand the networking setup for the pod and its containers.
+
+1. List Network Namespaces:
+You can list all the network namespaces using the following command:
+
+bash
+Copy code
+ip netns list
+This will display the network namespaces currently in use, including namespaces for pods and other processes.
+
+2. Identifying the Pause Container:
+The pause container is a special container that Kubernetes uses to create and manage the network namespace for the pod. It's an essential part of Kubernetes pod networking.
+
+When you run the command kubectl run nginx --image=nginx, Kubernetes will also create a pause container in the background for the pod. The pause container is responsible for holding the network namespace and other resources that all containers within the pod share.
+To identify the pause container and its corresponding network namespace, use the following commands:
+
+bash
+Copy code
+lsns | grep nginx
+This will list the namespaces related to the nginx container, and you can find the network namespace associated with the pod.
+
+3. Inspect Network Namespace for Specific PID:
+Once you identify the process ID (PID) associated with the pause container, you can use the lsns -p <pid> command to inspect its namespace.
+
+bash
+Copy code
+lsns -p <pid>
+4. Check Network Namespaces Directory:
+The network namespaces are typically located under /var/run/netns. You can list the namespaces by running:
+
+bash
+Copy code
+ls -lt /var/run/netns
+This shows the network namespaces available on the system, including those created for containers and pods.
+
+5. Execute Commands Inside a Network Namespace:
+To inspect the network interfaces within a specific namespace, you can use the ip netns exec command. Replace <namespace> with the actual namespace ID (such as a CNI-generated namespace):
+
+bash
+Copy code
+ip netns exec <namespace> ip link
+Alternatively, you can execute a command within the pod directly using:
+
+bash
+Copy code
+kubectl exec -it shared-namespace -- ip addr
+6. Inspecting veth Pairs:
+Each pod in Kubernetes is connected to the host network through veth pairs (virtual Ethernet interfaces). The veth pair allows communication between the container's network namespace and the host's network namespace.
+
+To find the corresponding veth pair on the host, first, list all network interfaces:
+
+bash
+Copy code
+ip link show
+Then, look for the veth pair that connects the pod’s network namespace to the host:
+
+bash
+Copy code
+ip link show | grep cali
+You can verify the connection by inspecting the interface:
+
+bash
+Copy code
+sudo ethtool -S <veth-interface>
+Example Workflow:
+Here is an example workflow that combines the above steps:
+
+List network interfaces on the host:
+
+bash
+Copy code
+ip link show
+List network namespaces:
+
+bash
+Copy code
+sudo ip netns list
+Inspect network interfaces inside a specific namespace:
+
+bash
+Copy code
+sudo ip netns exec <namespace> ip link
+Find veth pairs:
+
+bash
+Copy code
+ip link show | grep cali
+Verify the veth pair connection:
+
+bash
+Copy code
+sudo ethtool -S <veth-interface>
+Conclusion:
+The network namespace in Kubernetes allows for network isolation between different pods and containers. By using tools like ip netns, kubectl exec, and lsns, you can inspect and understand the network setup for your pods, view the network interfaces, and analyze the veth pairs created by the CNI plugin for communication between pods and the host network. This level of visibility can help debug networking issues and verify the proper functioning of network configurations within Kubernetes.
